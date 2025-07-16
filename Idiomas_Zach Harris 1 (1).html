@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>IDIOM MÁS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Press Start 2P', cursive;
+            background: #1a1a1a;
+            color: white;
+            text-align: center;
+        }
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(10, 30px);
+            grid-template-rows: repeat(10, 30px);
+            gap: 2px;
+            justify-content: center;
+            margin: 20px auto;
+        }
+        .cell {
+            width: 30px;
+            height: 30px;
+            background: linear-gradient(to bottom right, #ff69b4, #00ffff);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: black;
+            font-weight: bold;
+        }
+        .revealed {
+            background: #ffffff;
+        }
+        .bomb,
+        .proximity {
+            background-color: grey !important;
+        }
+        #phraseInput {
+            margin-top: 20px;
+        }
+        #result {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        #guessesLeft {
+            font-size: 18px;
+            margin-top: 10px;
+        }
+        #exploredPercent {
+            margin-top: 5px;
+            font-size: 14px;
+            color: #aaa;
+        }
+#revealSection h3 {
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+#revealSection p {
+    font-size: 12px;
+    color: #ffffff;
+    max-width: 200px;
+    margin: 0 auto;
+    word-wrap: break-word;
+}
+
+    </style>
+</head>
+<body>
+    <h1>IDIOM MÁS</h1>
+    <div id="grid"></div>
+    <div id="phraseInput">
+        <input type="text" id="guess" placeholder="Type the secret phrase..." />
+        <button onclick="submitGuess()">Submit</button>
+    </div>
+    <div id="guessesLeft">Guesses Left: <span id="guessesCount"></span></div>
+    <div id="exploredPercent">Explored: <span id="percentRevealed">0%</span></div>
+    <button onclick="resetGame()">Reset</button>
+    <button onclick="revealPhrase()">Reveal Phrase</button>
+    <button onclick="newPuzzle()">New Puzzle</button>
+    <div id="result"></div>
+    <canvas id="fireworks" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;"></canvas>
+
+<div id="revealSection" style="display:none; margin-top: 30px;">
+    <div style="display: flex; justify-content: center; gap: 50px;">
+        <div>
+            <h3>Phrase:</h3>
+            <p id="originalPhrase"></p>
+        </div>
+        <div>
+            <h3>Translation:</h3>
+            <p id="translatedPhrase"></p>
+        </div>
+    </div>
+</div>
+
+
+    <script>
+        const gridSize = 10;
+        const totalCells = gridSize * gridSize;
+        const phrases = [
+            "ONCE IN A BLUE MOON",
+            "TAKE IT WITH A PINCH OF SALT",
+            "COME RAIN OR SHINE",
+            "THROUGH THICK AND THIN",
+            "PIECE OF CAKE",
+            "BEAT AROUND THE BUSH",
+            "BY THE SKIN OF YOUR TEETH",
+            "COST AN ARM AND A LEG",
+            "A BLESSING IN DISGUISE",
+            "BREAK THE ICE",
+            "BARKING UP THE WRONG TREE",
+            "SPILL THE BEANS",
+            "THE APPLE OF MY EYE",
+            "ADD INSULT TO INJURY",
+            "ACTIONS SPEAK LOUDER THAN WORDS",
+            "DONT CRY OVER SPILLED MILK",
+            "UNDER THE WEATHER",
+            "SER PAN COMIDO",
+            "ESTAR COMO UNA CABRA",
+            "TENER MALA LECHE",
+            "METER LA PATA",
+            "TIRAR LA CASA POR LA VENTANA",
+            "SER UNA Y CARNE",
+            "TU MEDIA NARANJA",
+            "A QUIEN MADRUGA DIOS LE AYUDA",
+            "DARLE LA VUELTA A LA TORTILLA",
+            "MAS VALE TARDE QUE NUNCA",
+            "EL MUNDO ES UN PANUELO",
+            "ESTAR EN LAS NUBES",
+            "NO TODO LO QUE BRILLA ES ORO",
+            "DAR EN EL CLAVO",
+            "ECHAR LENA AL FUEGO",
+            "ESTAR ENTRE LA ESPADA Y LA PARED",
+            "BUSCARLE TRES PIES AL GATO",
+            "HABLAR POR LOS CODOS",
+            "SACAR LOS TRAPOS SUCIOS",
+            "SER EL OJO DERECHO",
+            "TENER UN HUMOR DE PERROS",
+            "PELOS EN LA LENGUA",
+            "LA GALLINA DE LOS HUEVOS DE ORO"
+        ];
+        let phrase = "";
+        let maxGuesses = 0;
+        let guesses = 0;
+        const grid = document.getElementById('grid');
+        const cells = [];
+        const guessesCountEl = document.getElementById('guessesCount');
+        const percentRevealedEl = document.getElementById('percentRevealed');
+
+        function updateGuessesLeft() {
+            const remaining = maxGuesses - guesses;
+            guessesCountEl.textContent = remaining;
+            guessesCountEl.style.color = remaining <= 3 ? 'red' : 'white';
+        }
+
+        function updateExploredPercent() {
+            const revealedCount = cells.filter(c => c.classList.contains('revealed')).length;
+            const percent = Math.round((revealedCount / totalCells) * 100);
+            percentRevealedEl.textContent = percent + "%";
+        }
+
+        function createGrid() {
+            grid.innerHTML = "";
+            cells.length = 0;
+            for (let i = 0; i < totalCells; i++) {
+                const cell = document.createElement('div');
+                cell.classList.add('cell');
+                cell.dataset.index = i;
+                cell.addEventListener('click', handleClick);
+                grid.appendChild(cell);
+                cells.push(cell);
+            }
+        }
+
+        function getNeighbors(index) {
+            const dirs = [-1, 1, -gridSize, gridSize, -gridSize - 1, -gridSize + 1, gridSize - 1, gridSize + 1];
+            return dirs.map(d => index + d).filter(i => i >= 0 && i < totalCells);
+        }
+
+        function handleClick(e) {
+            const cell = e.target;
+            if (cell.classList.contains('revealed') || guesses >= maxGuesses) return;
+            cell.classList.add('revealed');
+            guesses++;
+
+            if (cell.dataset.type === 'bomb') {
+                cell.textContent = "💣";
+                cell.classList.add('bomb');
+                guesses += 5;
+            } else if (cell.dataset.type === 'letter') {
+                cell.textContent = cell.dataset.letter;
+                guesses -= 2;
+            } else {
+                const index = parseInt(cell.dataset.index);
+                const distance = calculateProximity(index);
+                cell.textContent = distance;
+                cell.classList.add('proximity');
+            }
+
+            updateGuessesLeft();
+            updateExploredPercent();
+
+            const allLettersFound = cells.every(cell => {
+                if (cell.dataset.type === 'letter') {
+                    return cell.classList.contains('revealed');
+                }
+                return true;
+            });
+            if (allLettersFound) {
+                showFireworks();
+                document.getElementById('result').textContent = "🎉 You revealed all the letters!";
+            }
+        }
+
+        function calculateProximity(index) {
+            let minDist = gridSize * 2;
+            cells.forEach((cell, i) => {
+                if (cell.dataset.type === 'letter') {
+                    const dx = Math.abs((i % gridSize) - (index % gridSize));
+                    const dy = Math.abs(Math.floor(i / gridSize) - Math.floor(index / gridSize));
+                    const dist = Math.max(dx, dy);
+                    if (dist < minDist) minDist = dist;
+                }
+            });
+            return minDist;
+        }
+
+        function placePhrase() {
+            const words = phrase.split(" ");
+            let used = new Set();
+            for (let w = 0; w < words.length; w++) {
+                const word = words[w];
+                let placed = false;
+                while (!placed) {
+                    const vertical = Math.random() < 0.5;
+                    const row = Math.floor(Math.random() * (vertical ? gridSize - word.length : gridSize));
+                    const col = Math.floor(Math.random() * (vertical ? gridSize : gridSize - word.length));
+                    let conflict = false;
+                    const indexes = [];
+                    for (let i = 0; i < word.length; i++) {
+                        const r = vertical ? row + i : row;
+                        const c = vertical ? col : col + i;
+                        const idx = r * gridSize + c;
+                        if (used.has(idx)) { conflict = true; break; }
+                        indexes.push(idx);
+                    }
+                    if (!conflict) {
+                        indexes.forEach((idx, i) => {
+                            used.add(idx);
+                            cells[idx].dataset.type = 'letter';
+                            cells[idx].dataset.letter = word[i];
+                        });
+                        placed = true;
+                        if (w < words.length - 1) {
+                            let buffer;
+                            do {
+                                buffer = Math.floor(Math.random() * totalCells);
+                            } while (used.has(buffer));
+                            used.add(buffer);
+                        }
+                    }
+                }
+            }
+            let bombsPlaced = 0;
+            while (bombsPlaced < 10) {
+                const i = Math.floor(Math.random() * totalCells);
+                if (!used.has(i) && !cells[i].dataset.type) {
+                    cells[i].dataset.type = 'bomb';
+                    used.add(i);
+                    bombsPlaced++;
+                }
+            }
+        }
+
+        function resetGame() {
+    guesses = 0;
+    maxGuesses = phrase.replace(/\s/g, "").length;
+    createGrid();
+    placePhrase();
+    updateGuessesLeft();
+    updateExploredPercent();
+    document.getElementById('result').textContent = "";
+    document.getElementById('guess').value = "";
+    document.getElementById('revealSection').style.display = 'none';  // ✅ HIDE IT
+}
+
+
+        function newPuzzle() {
+            phrase = phrases[Math.floor(Math.random() * phrases.length)].toUpperCase();
+            resetGame();
+        }
+
+        function submitGuess() {
+    const userInput = document.getElementById('guess').value.toUpperCase().replace(/\s/g, "");
+    if (userInput === phrase.replace(/\s/g, "")) {
+        revealPhrase();
+        showFireworks();
+        document.getElementById('result').textContent = "🎉 Correct! You found the phrase.";
+        showPhraseAndTranslation();  // ✅ ADD THIS LINE
+    } else {
+        document.getElementById('result').textContent = "❌ Incorrect guess. Game Over.";
+    }
+}
+
+
+        function revealPhrase() {
+            cells.forEach(cell => {
+                if (cell.dataset.type === 'letter') {
+                    cell.textContent = cell.dataset.letter;
+                    cell.classList.add('revealed');
+                } else if (cell.dataset.type === 'bomb') {
+                    cell.textContent = "💣";
+                    cell.classList.add('revealed', 'bomb');
+                } else {
+                    const index = parseInt(cell.dataset.index);
+                    const distance = calculateProximity(index);
+                    cell.textContent = distance;
+                    cell.classList.add('revealed', 'proximity');
+                }
+            });
+showPhraseAndTranslation();
+        }
+
+        function showFireworks() {
+            const canvas = document.getElementById('fireworks');
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            const particles = [];
+            const colors = ['#ff4d4d', '#66ff66', '#3399ff', '#ffff66', '#ff66cc'];
+            for (let i = 0; i < 150; i++) {
+                particles.push({
+                    x: canvas.width / 2,
+                    y: canvas.height / 2,
+                    radius: Math.random() * 3 + 2,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    speed: Math.random() * 4 + 2,
+                    angle: Math.random() * 2 * Math.PI,
+                    alpha: 1
+                });
+            }
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                particles.forEach(p => {
+                    ctx.globalAlpha = p.alpha;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = p.color;
+                    ctx.fill();
+                });
+            }
+            function update() {
+                particles.forEach(p => {
+                    p.x += Math.cos(p.angle) * p.speed;
+                    p.y += Math.sin(p.angle) * p.speed;
+                    p.alpha -= 0.01;
+                });
+            }
+            function loop() {
+                draw();
+                update();
+                if (particles.some(p => p.alpha > 0)) {
+                    requestAnimationFrame(loop);
+                }
+            }
+            loop();
+        }
+function getTranslation(text) {
+    const englishToSpanish = {
+        "ONCE IN A BLUE MOON": "DE VEZ EN CUANDO",
+        "TAKE IT WITH A PINCH OF SALT": "TÓMALO CON PINZAS",
+        "COME RAIN OR SHINE": "LLUEVA O TRUENE",
+        "THROUGH THICK AND THIN": "EN LAS BUENAS Y EN LAS MALAS",
+        "PIECE OF CAKE": "ESTÁ TIRADO",
+        "BEAT AROUND THE BUSH": "ANDARSE POR LAS RAMAS",
+        "BY THE SKIN OF YOUR TEETH": "POR LOS PELOS",
+        "COST AN ARM AND A LEG": "CUESTA UN OJO DE LA CARA",
+        "A BLESSING IN DISGUISE": "UNA BENDICIÓN DISFRAZADA",
+        "BREAK THE ICE": "ROMPER EL HIELO",
+        "BARKING UP THE WRONG TREE": "ESTÁS EQUIVOCADO",
+        "SPILL THE BEANS": "REVELAR UN SECRETO",
+        "THE APPLE OF MY EYE": "MI CONSENTIDO",
+        "ADD INSULT TO INJURY": "EMPEORAR LAS COSAS",
+        "ACTIONS SPEAK LOUDER THAN WORDS": "LOS HECHOS DICEN MÁS QUE LAS PALABRAS",
+        "DONT CRY OVER SPILLED MILK": "A LO HECHO, PECHO",
+        "UNDER THE WEATHER": "SENTIRSE MAL",
+        "SER PAN COMIDO": "PIECE OF CAKE",
+        "ESTAR COMO UNA CABRA": "TO BE CRAZY",
+        "TENER MALA LECHE": "TO HAVE BAD INTENTIONS",
+        "METER LA PATA": "TO MESS UP",
+        "TIRAR LA CASA POR LA VENTANA": "SPARE NO EXPENSE",
+        "SER UNA Y CARNE": "TO BE INSEPARABLE",
+        "TU MEDIA NARANJA": "YOUR SOULMATE",
+        "A QUIEN MADRUGA DIOS LE AYUDA": "THE EARLY BIRD CATCHES THE WORM",
+        "DARLE LA VUELTA A LA TORTILLA": "TO TURN THE TABLES",
+        "MAS VALE TARDE QUE NUNCA": "BETTER LATE THAN NEVER",
+        "EL MUNDO ES UN PANUELO": "IT’S A SMALL WORLD",
+        "ESTAR EN LAS NUBES": "TO DAYDREAM",
+        "NO TODO LO QUE BRILLA ES ORO": "ALL THAT GLITTERS ISN’T GOLD",
+        "DAR EN EL CLAVO": "TO HIT THE NAIL ON THE HEAD",
+        "ECHAR LENA AL FUEGO": "TO ADD FUEL TO THE FIRE",
+        "ESTAR ENTRE LA ESPADA Y LA PARED": "TO BE BETWEEN A ROCK AND A HARD PLACE",
+        "BUSCARLE TRES PIES AL GATO": "TO OVERCOMPLICATE THINGS",
+        "HABLAR POR LOS CODOS": "TO TALK A LOT",
+        "SACAR LOS TRAPOS SUCIOS": "AIR THE DIRTY LAUNDRY",
+        "SER EL OJO DERECHO": "TO BE THE APPLE OF THE EYE",
+        "TENER UN HUMOR DE PERROS": "TO BE IN A FOUL MOOD",
+        "PELOS EN LA LENGUA": "TO SPEAK FRANKLY",
+        "LA GALLINA DE LOS HUEVOS DE ORO": "THE GOOSE THAT LAID THE GOLDEN EGGS"
+    };
+
+    const upper = text.toUpperCase();
+    if (englishToSpanish[upper]) {
+        return englishToSpanish[upper];
+    }
+    // Try reverse lookup (Spanish to English)
+    const reversed = Object.entries(englishToSpanish).find(([en, es]) => es === upper);
+    return reversed ? reversed[0] : "Translation not found.";
+}
+
+function showPhraseAndTranslation() {
+    // Format phrase with proper casing and spacing
+    const original = phrase
+        .split(" ")
+        .map(word => word[0] + word.slice(1).toLowerCase())
+        .join(" ");
+
+    const originalEl = document.getElementById('originalPhrase');
+    const translatedEl = document.getElementById('translatedPhrase');
+
+    originalEl.textContent = original;
+    translatedEl.textContent = getTranslation(phrase);
+    document.getElementById('revealSection').style.display = 'block';
+}
+
+
+        newPuzzle();
+    </script>
+</body>
+</html>
