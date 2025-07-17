@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Giraffe Battle MVP</title>
+  <style>
+    html, body {
+      margin: 0;
+      overflow: hidden;
+      background: #e0f7fa;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<script>
+const canvas = document.getElementById('game');
+alert("Giraffe code is loading!");
+
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let keys = {};
+let gravity = 0.5;
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+const player = {
+  width: 40,
+  height: 500,
+  x: canvas.width / 2 - 20, // center player's body horizontally
+  y: canvas.height - 100,
+  vx: 0,
+  vy: 0,
+  jumping: false,
+  baseX: 0,
+  baseY: 0,
+  headX: canvas.width / 2,        // center of screen
+  headY: canvas.height - 150,     // above body
+  launched: false
+};
+
+player.headX = player.x + player.width / 2;
+player.headY = player.y - 120;
+
+
+const opponent = {
+  x: canvas.width - 150,
+  y: canvas.height - 500,
+  width: 40,
+  height: 500,
+  headX: canvas.width - 130,
+  headY: canvas.height - 550
+};
+
+let mouseDown = false;
+let launchVector = { x: 0, y: 0 };
+
+document.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
+document.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+
+canvas.addEventListener('mousedown', (e) => {
+  if (!player.launched) {
+    mouseDown = true;
+    player.headX = e.clientX;
+    player.headY = e.clientY;
+  }
+});
+
+
+canvas.addEventListener('mousemove', (e) => {
+  if (mouseDown && !player.launched) {
+    player.headX = e.clientX;
+    player.headY = e.clientY;
+  }
+});
+
+canvas.addEventListener('mouseup', (e) => {
+  if (mouseDown && !player.launched) {
+    const dx = player.baseX - player.headX;
+    const dy = player.baseY - player.headY;
+    launchVector = { x: dx * 0.1, y: dy * 0.1 };
+    player.launched = true;
+    mouseDown = false;
+  }
+});
+
+function updatePlayer() {
+  player.vy += gravity;
+  player.y += player.vy;
+  player.x += player.vx;
+
+  if (player.y > canvas.height - player.height) {
+    player.y = canvas.height - player.height;
+    player.vy = 0;
+    player.jumping = false;
+  }
+
+  if (keys['a']) player.vx = -4;
+  else if (keys['d']) player.vx = 4;
+  else player.vx = 0;
+
+  if (keys[' '] && !player.jumping) {
+    player.vy = -12;
+    player.jumping = true;
+  }
+
+  player.baseX = player.x + player.width / 2;
+  player.baseY = player.y;
+
+  if (player.launched) {
+    player.headX += launchVector.x;
+    player.headY += launchVector.y;
+    launchVector.y += 0.2;
+  // If head goes too far off screen or slows down enough, reset
+  if (
+    player.headY > canvas.height + 100 ||
+    player.headX < -100 || player.headX > canvas.width + 100 ||
+    (Math.abs(launchVector.x) < 0.1 && Math.abs(launchVector.y) < 0.1)
+  ) {
+    player.launched = false;
+  }
+
+  } else if (!mouseDown) {
+    // head easing back to rest position
+    const restX = player.baseX;
+    const restY = player.baseY - 120;
+    player.headX = lerp(player.headX, restX, 0.1);
+    player.headY = lerp(player.headY, restY, 0.1);
+  }
+}
+
+
+function updateOpponent() {
+  opponent.headX += Math.random() * 2 - 1;
+  opponent.headY += Math.sin(Date.now() * 0.001) * 0.5;
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Neck
+  ctx.beginPath();
+  ctx.moveTo(player.baseX, player.baseY);
+  ctx.lineTo(player.headX, player.headY);
+  ctx.strokeStyle = player.launched ? '#d32f2f' : '#8d6e63';
+  ctx.lineWidth = 8;
+  ctx.stroke();
+
+  // Player body
+  ctx.fillStyle = '#ffcc80';
+  ctx.fillRect(player.x, player.y, player.width, player.height);
+
+  // Player head
+  ctx.beginPath();
+  ctx.arc(player.headX, player.headY, 20, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffab40';
+  ctx.fill();
+
+  // Opponent body
+  ctx.fillStyle = '#90caf9';
+  ctx.fillRect(opponent.x, opponent.y, opponent.width, opponent.height);
+
+  // Opponent head
+  ctx.beginPath();
+  ctx.arc(opponent.headX, opponent.headY, 20, 0, Math.PI * 2);
+  ctx.fillStyle = '#42a5f5';
+  ctx.fill();
+
+  // Collision
+  const dx = player.headX - opponent.headX;
+  const dy = player.headY - opponent.headY;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist < 40 && player.launched) {
+    confetti(opponent.headX, opponent.headY);
+    player.launched = false;
+  }
+}
+
+let particles = [];
+
+function confetti(x, y) {
+  for (let i = 0; i < 20; i++) {
+    particles.push({
+      x, y,
+      vx: Math.random() * 6 - 3,
+      vy: Math.random() * -4 - 2,
+      color: `hsl(${Math.random() * 360}, 100%, 60%)`,
+      life: 60
+    });
+  }
+}
+
+function drawParticles() {
+  particles = particles.filter(p => p.life-- > 0);
+  particles.forEach(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.1;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x, p.y, 4, 4);
+  });
+}
+
+function loop() {
+  updatePlayer();
+  updateOpponent();
+  draw();
+  drawParticles();
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+</body>
+</html>
+
