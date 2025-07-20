@@ -9,7 +9,6 @@
       padding: 0;
       height: 100%;
       font-family: 'Georgia', serif;
-      overflow: hidden;
     }
 
     #container {
@@ -18,6 +17,7 @@
       width: 100vw;
       position: relative;
       flex-direction: row;
+      overflow: hidden;
     }
 
     #image-area {
@@ -83,21 +83,30 @@
       background: #444;
     }
 
-    /* 📱 Mobile layout */
+    /* ✅ Mobile layout override */
     @media (max-width: 768px) {
+      html, body {
+        height: auto;
+        overflow: auto;
+      }
+
       #container {
         flex-direction: column;
         height: auto;
+        overflow: visible;
       }
 
       #image-area {
-        height: 45vh;
+        height: 40vh;
         width: 100%;
+        flex: none;
       }
 
       #journal {
-        height: 45vh;
+        height: 40vh;
         width: 100%;
+        flex: none;
+        font-size: 16px;
       }
 
       #send-btn,
@@ -119,7 +128,7 @@
     <button id="send-btn">Send</button>
   </div>
 
-  <!-- 🔁 Connect logic -->
+  <!-- JS -->
   <script src="OTTG.js"></script>
 </body>
 </html>
