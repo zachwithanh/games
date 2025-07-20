@@ -3,26 +3,27 @@
 <head>
   <meta charset="UTF-8" />
   <title>Reveal With Words</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     html, body {
       margin: 0;
       padding: 0;
-      height: 100%;
       font-family: 'Georgia', serif;
+      height: 100%;
+      width: 100%;
+      box-sizing: border-box;
+      overflow-x: hidden;
     }
 
     #container {
       display: flex;
-      height: 100vh;
-      width: 100vw;
-      position: relative;
       flex-direction: row;
-      overflow: hidden;
+      height: 100vh;
     }
 
     #image-area {
-      position: relative;
       flex: 2;
+      position: relative;
       background-color: white;
       overflow: hidden;
     }
@@ -63,10 +64,18 @@
       box-sizing: border-box;
     }
 
-    #send-btn, #save-btn {
-      position: absolute;
-      bottom: 20px;
-      z-index: 10;
+    #button-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 10px;
+      background-color: #fff;
+      gap: 10px;
+      border-top: 1px solid #ccc;
+    }
+
+    #send-btn,
+    #save-btn {
       padding: 10px 15px;
       background: #222;
       color: white;
@@ -76,44 +85,34 @@
       font-size: 14px;
     }
 
-    #send-btn { right: 20px; }
-    #save-btn { right: 100px; }
-
-    #send-btn:hover, #save-btn:hover {
+    #send-btn:hover,
+    #save-btn:hover {
       background: #444;
     }
 
-    /* ✅ Mobile layout override */
+    /* 📱 Mobile layout */
     @media (max-width: 768px) {
-      html, body {
-        height: auto;
-        overflow: auto;
-      }
-
       #container {
         flex-direction: column;
         height: auto;
-        overflow: visible;
+        min-height: 100vh;
       }
 
       #image-area {
-        height: 40vh;
         width: 100%;
-        flex: none;
+        height: 40vh;
       }
 
       #journal {
-        height: 40vh;
+        height: 35vh;
         width: 100%;
-        flex: none;
         font-size: 16px;
       }
 
-      #send-btn,
-      #save-btn {
-        position: static;
-        margin: 10px;
-        display: inline-block;
+      #button-row {
+        position: sticky;
+        bottom: 0;
+        z-index: 10;
       }
     }
   </style>
@@ -124,13 +123,15 @@
       <div id="final-image"></div>
     </div>
     <textarea id="journal" placeholder="Write your letter to reveal the image..."></textarea>
-    <button id="save-btn">Save</button>
-    <button id="send-btn">Send</button>
+    <div id="button-row">
+      <button id="save-btn">Save</button>
+      <button id="send-btn">Send</button>
+    </div>
   </div>
 
-  <!-- JS -->
   <script src="OTTG.js"></script>
 </body>
 </html>
+
 
 
