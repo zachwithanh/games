@@ -110,7 +110,20 @@
     </div>
   </div>
 
-  <script src="OTTG.js"></script>
+   <script src="OTTG.js"></script>
+
+  <script>
+    const journal = document.getElementById("journal");
+    journal.addEventListener("focus", () => {
+      setTimeout(() => {
+        journal.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 300);
+    });
+  </script>
+</body>
+</html>
+
+  
 </body>
 </html>
 
