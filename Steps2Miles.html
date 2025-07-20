@@ -4,15 +4,23 @@
   <meta charset="UTF-8">
   <title>Step Distance Estimator</title>
   <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #f5faff;
-      color: #333;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 40px;
-    }
+    * {
+  box-sizing: border-box;
+}
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: #f5faff;
+  color: #333;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  margin: 0;
+  max-width: 100vw;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
     h1 {
       margin-bottom: 10px;
     }
@@ -21,15 +29,26 @@
       padding: 10px;
       font-size: 1em;
     }
+input, select, button {
+  width: 90vw;
+  max-width: 300px;
+  box-sizing: border-box;
+}
+
     .input-group {
       display: flex;
       flex-direction: column;
       align-items: center;
     }
     .height-fields {
-      display: flex;
-      gap: 10px;
-    }
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: 100%;
+}
+
     .buttons {
       margin-top: 15px;
     }
@@ -39,7 +58,7 @@
       color: #006400;
     }
   </style>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="apple-touch-icon" href="icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -139,4 +158,3 @@
 
 </body>
 </html>
-
