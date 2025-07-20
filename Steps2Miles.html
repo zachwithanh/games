@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Step Distance Estimator</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f5faff;
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px;
+    }
+    h1 {
+      margin-bottom: 10px;
+    }
+    label, select, input, button {
+      margin: 8px;
+      padding: 10px;
+      font-size: 1em;
+    }
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .height-fields {
+      display: flex;
+      gap: 10px;
+    }
+    .buttons {
+      margin-top: 15px;
+    }
+    #result {
+      margin-top: 20px;
+      font-size: 1.4em;
+      color: #006400;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>👟🏃‍♀️👟🏃🏿‍♂️👟 Step Distance Estimator</h1>
+
+  <div class="input-group">
+    <label for="unit">Select Unit System:</label>
+    <select id="unit" onchange="toggleHeightFields()">
+      <option value="imperial">Imperial (feet & inches)</option>
+      <option value="metric">Metric (cm)</option>
+    </select>
+
+    <div id="imperial-height" class="height-fields">
+      <input type="number" id="feet" placeholder="Feet (e.g. 6)" />
+      <input type="number" id="inches" placeholder="Inches (e.g. 4)" />
+    </div>
+
+    <input type="number" id="cm" placeholder="Height in cm" style="display: none;" />
+
+    <label for="steps">Steps Walked:</label>
+    <input type="number" id="steps" placeholder="e.g. 12000" />
+  </div>
+
+  <div class="buttons">
+    <button onclick="calculateDistance()">Calculate Distance</button>
+    <button onclick="resetFields()">Reset</button>
+  </div>
+
+  <div id="result"></div>
+
+  <script>
+    function toggleHeightFields() {
+      const unit = document.getElementById('unit').value;
+      const imperialDiv = document.getElementById('imperial-height');
+      const cmInput = document.getElementById('cm');
+
+      if (unit === 'imperial') {
+        imperialDiv.style.display = 'flex';
+        cmInput.style.display = 'none';
+      } else {
+        imperialDiv.style.display = 'none';
+        cmInput.style.display = 'block';
+      }
+    }
+
+    function calculateDistance() {
+      const unit = document.getElementById('unit').value;
+      const steps = parseInt(document.getElementById('steps').value);
+      const resultDiv = document.getElementById('result');
+
+      if (isNaN(steps) || steps <= 0) {
+        resultDiv.textContent = "🚨 Please enter a valid number of steps!";
+        return;
+      }
+
+      let stepLength, distance;
+
+      if (unit === "imperial") {
+        const feet = parseFloat(document.getElementById('feet').value);
+        const inches = parseFloat(document.getElementById('inches').value);
+        if (isNaN(feet) || isNaN(inches) || feet < 0 || inches < 0) {
+          resultDiv.textContent = "🚨 Please enter a valid height!";
+          return;
+        }
+        const totalInches = (feet * 12) + inches;
+        stepLength = totalInches * 0.413;
+        distance = (steps * stepLength) / 63360; // inches to miles
+        resultDiv.textContent = `You've walked approximately ${distance.toFixed(2)} miles! 🗺️`;
+      } else {
+        const cm = parseFloat(document.getElementById('cm').value);
+        if (isNaN(cm) || cm <= 0) {
+          resultDiv.textContent = "🚨 Please enter a valid height!";
+          return;
+        }
+        stepLength = cm * 0.413;
+        distance = (steps * stepLength) / 100000; // cm to kilometers
+        resultDiv.textContent = `You've walked approximately ${distance.toFixed(2)} kilometers! 🌍`;
+      }
+    }
+
+    function resetFields() {
+      document.getElementById('unit').value = 'imperial';
+      toggleHeightFields();
+      document.getElementById('feet').value = '';
+      document.getElementById('inches').value = '';
+      document.getElementById('cm').value = '';
+      document.getElementById('steps').value = '';
+      document.getElementById('result').textContent = '';
+    }
+
+    // Initialize on load
+    toggleHeightFields();
+  </script>
+
+</body>
+</html>
+
