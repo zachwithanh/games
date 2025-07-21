@@ -3,32 +3,30 @@
 <head>
   <meta charset="UTF-8" />
   <title>Reveal With Words</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <style>
     html, body {
       margin: 0;
       padding: 0;
+      height: 100%;
       font-family: 'Georgia', serif;
-      width: 100%;
-      min-height: 100dvh;
-      box-sizing: border-box;
-      overflow-x: hidden;
-      background: #fff;
+      overflow: auto;
     }
 
     #container {
-      display: flex;
-      flex-direction: column;
-      min-height: 100dvh;
-    }
+  display: flex;
+  flex-direction: column; /* ← added */
+  min-height: 100dvh;     /* ← dynamic viewport height (mobile-friendly) */
+}
+
 
     #image-area {
-      width: 100%;
-      height: 40vh;
-      position: relative;
-      background-color: white;
-      overflow: hidden;
-    }
+  width: 100%;
+  height: 100vh;           /* ← force full-height image */
+  position: relative;
+  background-color: white;
+  overflow: hidden;
+}
+
 
     .tile {
       position: absolute;
@@ -54,35 +52,24 @@
     }
 
     #journal {
-      flex: 1;
-      padding: 16px;
-      font-size: 16px;
-      background-color: rgba(255, 255, 255, 0.95);
-      border: none;
-      outline: none;
-      resize: none;
-      width: 100%;
-      box-sizing: border-box;
-      min-height: 30vh;
-      max-height: 40vh;
-      overflow-y: auto;
-    }
+  width: 100%;
+  padding: 20px;
+  font-size: 16px;
+  background-color: rgba(255, 255, 255, 0.95);
+  border: none;
+  outline: none;
+  resize: none;
+  min-height: 25vh;
+  max-height: 30vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
 
-    #button-row {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: 12px;
-      background-color: #fff;
-      gap: 10px;
-      border-top: 1px solid #ccc;
+
+    #send-btn, #save-btn {
+      position: absolute;
+      bottom: 20px;
       z-index: 10;
-      position: sticky;
-      bottom: 0;
-    }
-
-    #send-btn,
-    #save-btn {
       padding: 10px 15px;
       background: #222;
       color: white;
@@ -92,8 +79,10 @@
       font-size: 14px;
     }
 
-    #send-btn:hover,
-    #save-btn:hover {
+    #send-btn { right: 20px; }
+    #save-btn { right: 100px; }
+
+    #send-btn:hover, #save-btn:hover {
       background: #444;
     }
   </style>
@@ -104,14 +93,12 @@
       <div id="final-image"></div>
     </div>
     <textarea id="journal" placeholder="Write your letter to reveal the image..."></textarea>
-    <div id="button-row">
-      <button id="save-btn">Save</button>
-      <button id="send-btn">Send</button>
-    </div>
+    <button id="save-btn">Save</button>
+    <button id="send-btn">Send</button>
   </div>
 
-   <script src="OTTG.js"></script>
 
+  <script src="OTTG.js"></script>
   <script>
     const journal = document.getElementById("journal");
     journal.addEventListener("focus", () => {
@@ -123,8 +110,5 @@
 </body>
 </html>
 
-  
-</body>
-</html>
 
 
