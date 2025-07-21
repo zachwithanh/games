@@ -3,30 +3,49 @@
 <head>
   <meta charset="UTF-8" />
   <title>Reveal With Words</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     html, body {
       margin: 0;
       padding: 0;
       height: 100%;
       font-family: 'Georgia', serif;
-      overflow: auto;
+      overflow: hidden;
     }
 
     #container {
-  display: flex;
-  flex-direction: column; /* ← added */
-  min-height: 100dvh;     /* ← dynamic viewport height (mobile-friendly) */
-}
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+    }
 
+    /* Column layout on mobile */
+    @media (max-width: 768px) {
+      #container {
+        flex-direction: column;
+      }
+
+      #image-area {
+        height: 60vh;
+        flex: none;
+      }
+
+      #journal {
+        min-height: 20vh;
+      }
+
+      .button-bar {
+        padding: 12px;
+        justify-content: space-between;
+      }
+    }
 
     #image-area {
-  width: 100%;
-  height: 100vh;           /* ← force full-height image */
-  position: relative;
-  background-color: white;
-  overflow: hidden;
-}
-
+      flex: 2;
+      position: relative;
+      background-color: white;
+      overflow: hidden;
+    }
 
     .tile {
       position: absolute;
@@ -52,24 +71,26 @@
     }
 
     #journal {
-  width: 100%;
-  padding: 20px;
-  font-size: 16px;
-  background-color: rgba(255, 255, 255, 0.95);
-  border: none;
-  outline: none;
-  resize: none;
-  min-height: 25vh;
-  max-height: 30vh;
-  overflow-y: auto;
-  box-sizing: border-box;
-}
+      flex: 1;
+      padding: 20px;
+      font-size: 16px;
+      background-color: rgba(255, 255, 255, 0.95);
+      border: none;
+      outline: none;
+      resize: none;
+      box-sizing: border-box;
+    }
 
-
-    #send-btn, #save-btn {
+    .button-bar {
       position: absolute;
       bottom: 20px;
+      right: 20px;
+      display: flex;
+      gap: 10px;
       z-index: 10;
+    }
+
+    #send-btn, #save-btn {
       padding: 10px 15px;
       background: #222;
       color: white;
@@ -78,9 +99,6 @@
       cursor: pointer;
       font-size: 14px;
     }
-
-    #send-btn { right: 20px; }
-    #save-btn { right: 100px; }
 
     #send-btn:hover, #save-btn:hover {
       background: #444;
@@ -92,21 +110,17 @@
     <div id="image-area">
       <div id="final-image"></div>
     </div>
+
     <textarea id="journal" placeholder="Write your letter to reveal the image..."></textarea>
-    <button id="save-btn">Save</button>
-    <button id="send-btn">Send</button>
+
+    <div class="button-bar">
+      <button id="save-btn">Save</button>
+      <button id="send-btn">Send</button>
+    </div>
   </div>
 
-
+  <!-- JS logic -->
   <script src="OTTG.js"></script>
-  <script>
-    const journal = document.getElementById("journal");
-    journal.addEventListener("focus", () => {
-      setTimeout(() => {
-        journal.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 300);
-    });
-  </script>
 </body>
 </html>
 
