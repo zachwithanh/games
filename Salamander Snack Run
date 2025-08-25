@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- important for phones: fit to device, respect notches -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Salamander Snack Run</title>
+<style>
+  :root {
+    --ui: #ffffffee;
+    --good: #82f56a;
+    --bad: #ff5a7a;
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #0b2740; /* fallback while canvas boots */
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, sans-serif;
+    /* mobile quality-of-life */
+    -webkit-user-select: none;
+    user-select: none;
+    overscroll-behavior: none;
+    touch-action: none; /* prevent scroll during touch control */
+  }
+  /* use small viewport units to avoid URL bar jumps on mobile */
+  canvas { display:block; width:100svw; height:100svh }
+
+  /* fall back if browser doesn’t support sv* units */
+  @supports not (height: 100svh) {
+    canvas { width:100vw; height:100vh; }
+  }
+
+  #hud {
+    position: fixed;
+    left: max(12px, env(safe-area-inset-left));
+    top:  max(12px, env(safe-area-inset-top));
+    right: auto; bottom: auto;
+    background: var(--ui); color:#0b2740; padding:10px 14px; border-radius:12px;
+    box-shadow: 0 6px 20px rgba(0,0,0,.25); backdrop-filter: blur(2px);
+    display:flex; gap:16px; align-items:center; font-weight:600; flex-wrap: wrap;
+    z-index: 5;
+  }
+  #hud span { display:inline-flex; gap:6px; align-items:baseline; white-space:nowrap; }
+
+  #legend {
+    position: fixed;
+    right: max(12px, env(safe-area-inset-right));
+    top:   max(12px, env(safe-area-inset-top));
+    background: var(--ui);
+    padding:10px 14px; border-radius:12px; box-shadow: 0 6px 20px rgba(0,0,0,.25);
+    z-index: 5;
+  }
+  #legend div{display:flex; gap:8px; align-items:center; margin:4px 0}
+  .dot{width:12px; height:12px; border-radius:50%}
+  .good{ background: var(--good); box-shadow: 0 0 8px var(--good);}
+  .bad{ background: var(--bad); box-shadow: 0 0 8px var(--bad);}
+
+  /* overlay */
+  #centerMsg {
+    position:fixed; inset:0; display:grid; place-items:center;
+    color:#fff; text-shadow:0 4px 16px rgba(0,0,0,.6);
+    font-weight:800; letter-spacing:.5px;
+    padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+             max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    z-index: 10;
+    transition: opacity .35s ease, visibility .35s ease;
+    opacity:1; visibility:visible;
+  }
+  #centerMsg.hide {
+    opacity:0; visibility:hidden; pointer-events:none;
+  }
+  #centerMsg .card{
+    background: #0008; border:1px solid #fff3; border-radius:16px; padding:22px 26px;
+    text-align:center; max-width:680px;
+  }
+  #centerMsg button{
+    margin-top:14px; padding:14px 18px; border-radius:10px; border:0; cursor:pointer;
+    font-weight:700; background:#ffe66d; color:#4a2f00;
+    box-shadow:0 6px 18px rgba(0,0,0,.3);
+  }
+  #centerMsg p{margin:10px 0 0 0; opacity:.9}
+
+  /* mobile tweaks */
+  @media (max-width: 768px) {
+    #hud { font-size: 14px; gap: 10px; padding:8px 10px; border-radius:10px; }
+    #legend { font-size: 13px; padding:8px 10px; border-radius:10px; }
+    #centerMsg .card { max-width: 92vw; padding:18px; }
+  }
+  @media (max-width: 420px) {
+    /* compress legend to 1 line each or hide the helper line */
+    #legend div:last-child { display:none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud">
+  <span>Score: <b id="score">0</b></span>
+  <span>Size: <b id="sizePct">100%</b></span>
+  <span>Good: <b id="goodCount">0</b></span>
+  <span>Bad: <b id="badCount">0</b></span>
+</div>
+
+<div id="legend">
+  <div><span class="dot good"></span> Good → grow +3%</div>
+  <div><span class="dot bad"></span> Bad → shrink −7%</div>
+  <div style="opacity:.75; margin-top:6px">Touch/Mouse to swim</div>
+</div>
+
+<div id="centerMsg" class="">
+  <div class="card">
+    <h1>Salamander Snack Run</h1>
+    <p>Swim with <b>touch or mouse</b>. Eat the <b style="color:var(--good)">good</b>, dodge the <b style="color:var(--bad)">bad</b>.</p>
+    <p>Grow to 250% to win. Shrink to 50% and... salamander soup.</p>
+    <button id="startBtn">Start</button>
+    <p style="font-size:.9rem; opacity:.8">Pro tip: hug currents & nibble in clusters.</p>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const hud = {
+    score: document.getElementById('score'),
+    sizePct: document.getElementById('sizePct'),
+    good: document.getElementById('goodCount'),
+    bad: document.getElementById('badCount')
+  };
+  const center = document.getElementById('centerMsg');
+  const startBtn = document.getElementById('startBtn');
+
+  // ---- viewport & DPR handling (use inner sizes; also react to visualViewport)
+  function fit() {
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    const w = Math.floor((window.innerWidth || document.documentElement.clientWidth) * dpr);
+    const h = Math.floor((window.innerHeight || document.documentElement.clientHeight) * dpr);
+    canvas.width = w; canvas.height = h;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  addEventListener('resize', fit, {passive:true});
+  if (window.visualViewport) {
+    visualViewport.addEventListener('resize', fit, {passive:true});
+  }
+  addEventListener('orientationchange', fit, {passive:true});
+  fit();
+
+  // ---- mouse & touch control (smooth follow)
+  const pointer = { x: innerWidth*0.3, y: innerHeight*0.5 };
+  addEventListener('mousemove', e => { pointer.x = e.clientX; pointer.y = e.clientY; });
+
+  // touch: prevent page scroll while controlling, and set pointer
+  addEventListener('touchstart', e => {
+    const t = e.touches[0]; if (t) { pointer.x = t.clientX; pointer.y = t.clientY; }
+  }, {passive:true});
+  addEventListener('touchmove', e => {
+    const t = e.touches[0]; if (t) { pointer.x = t.clientX; pointer.y = t.clientY; }
+    e.preventDefault(); // stop page from scrolling
+  }, {passive:false});
+
+  // ---- game state
+  const state = {
+    running:false,
+    score:0,
+    good:0,
+    bad:0,
+    salamander: {
+      x: innerWidth*0.3,
+      y: innerHeight*0.5,
+      vx:0, vy:0,
+      base: 46,
+      scale: 1.0,
+      angle: 0
+    },
+    items: [],
+    spawnTimer: 0,
+    t: 0,
+    winScale: 2.5,   // 250%
+    loseScale: 0.5   // 50%
+  };
+
+  // ---- helpers
+  function rand(a,b){ return a + Math.random()*(b-a); }
+  function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+
+  // ---- background: river gradient + stones + currents
+  const stones = Array.from({length: 26}, () => ({
+    x: Math.random()*innerWidth,
+    y: Math.random()*innerHeight,
+    r: rand(10, 36),
+    n: Math.random()*Math.PI*2
+  }));
+  function drawBackground() {
+    const g = ctx.createLinearGradient(0,0,0,innerHeight);
+    g.addColorStop(0, '#133858');
+    g.addColorStop(0.5, '#0f2e47');
+    g.addColorStop(1, '#0b2537');
+    ctx.fillStyle = g; ctx.fillRect(0,0,innerWidth,innerHeight);
+
+    ctx.globalAlpha = 0.07; ctx.fillStyle = '#ffffff';
+    for (let i=0;i<80;i++){
+      const x = (i*127 + (state.t*15))% (innerWidth+80) - 40;
+      const y = (i*53 % innerHeight);
+      ctx.beginPath(); ctx.arc(x,y,1.2,0,Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    ctx.fillStyle = '#223b4f';
+    stones.forEach(s=>{
+      s.n += 0.0015;
+      const wob = Math.sin(s.n)*2;
+      ctx.beginPath();
+      ctx.ellipse(s.x, s.y+wob, s.r*1.2, s.r, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,.15)'; ctx.stroke();
+    });
+
+    ctx.save(); ctx.globalAlpha = 0.08;
+    for (let k=0;k<4;k++){
+      const y0 = (k+1) * innerHeight/5 + Math.sin(state.t*0.0015 + k)*18;
+      ctx.beginPath();
+      ctx.moveTo(innerWidth+40, y0);
+      for (let x=innerWidth+40;x>-80;x-=40){
+        const y = y0 + Math.sin((x+state.t*0.2+k*77)*0.01)*12;
+        ctx.lineTo(x, y);
+      }
+      ctx.lineWidth = 24;
+      ctx.strokeStyle = '#9ad0ff'; ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ---- spawn logic
+  function spawnItem() {
+    const isBad = Math.random() < 0.27; // ~27% bad
+    const y = rand(50, innerHeight-50);
+    const speed = rand(0.7, 1.5) + (state.t*0.0002); // mobile-friendly default
+    const kind = isBad ? (Math.random() < 0.5 ? 'trash' : 'toxin') : (Math.random()<0.5 ? 'bug' : 'larva');
+    const r = isBad ? rand(10,20) : rand(8,16);
+    state.items.push({
+      x: innerWidth + 30,
+      y, r, speed, kind,
+      rot: rand(0, Math.PI*2),
+      omega: rand(-0.02, 0.02),
+      wobble: rand(0.5, 2.2)
+    });
+  }
+
+  function drawItem(it) {
+    ctx.save(); ctx.translate(it.x, it.y); ctx.rotate(it.rot);
+    if (it.kind === 'bug') {
+      ctx.fillStyle = 'rgba(130,245,106,0.95)';
+      ctx.beginPath(); ctx.ellipse(0,0,it.r*1.2,it.r*0.8,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#2b5722';
+      ctx.beginPath(); ctx.arc(-it.r*0.2, -it.r*0.1, it.r*0.15, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(it.r*0.2, it.r*0.05, it.r*0.15, 0, Math.PI*2); ctx.fill();
+    } else if (it.kind === 'larva') {
+      for (let i=0;i<4;i++){
+        ctx.fillStyle = 'rgba(160,255,190,0.9)';
+        ctx.beginPath(); ctx.arc(-i*it.r*0.6, 0, it.r*0.5 + (i===0?0.2*it.r:0), 0, Math.PI*2); ctx.fill();
+      }
+    } else if (it.kind === 'trash') {
+      ctx.fillStyle = 'rgba(180,190,200,0.95)';
+      ctx.fillRect(-it.r*0.9, -it.r*0.6, it.r*1.8, it.r*1.2);
+      ctx.strokeStyle = 'rgba(60,60,60,0.6)';
+      ctx.lineWidth = 2; ctx.strokeRect(-it.r*0.9, -it.r*0.6, it.r*1.8, it.r*1.2);
+    } else if (it.kind === 'toxin') {
+      ctx.fillStyle = 'rgba(168, 84, 255, 0.9)';
+      ctx.beginPath(); ctx.ellipse(0,0,it.r*1.1, it.r*0.9, 0, 0, Math.PI*2); ctx.fill();
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath(); ctx.ellipse(0,0,it.r*1.5, it.r*1.2, 0, 0, Math.PI*2); ctx.strokeStyle='#c9a6ff'; ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+
+  // ---- salamander
+  function drawSalamander(s) {
+    const kFollow = 0.15;
+    s.vx += (pointer.x - s.x) * kFollow;
+    s.vy += (pointer.y - s.y) * kFollow;
+    s.vx *= 0.82; s.vy *= 0.82;
+    s.x += s.vx * 0.016; s.y += s.vy * 0.016;
+
+    s.x = clamp(s.x, 30, innerWidth-30);
+    s.y = clamp(s.y, 30, innerHeight-30);
+
+    s.angle = Math.atan2(s.vy, s.vx || 0.0001);
+    const L = s.base * s.scale;
+
+    ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(s.angle);
+
+    const t = state.t * 0.02;
+    const tailWob = Math.sin(t)*0.4 + Math.sin(t*0.7)*0.2;
+
+    ctx.fillStyle = '#ffe047';
+    ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 2;
+
+    ctx.beginPath(); ctx.ellipse(0, 0, L*0.75, L*0.36, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(L*0.4, 0);
+    ctx.quadraticCurveTo(L*0.8, L*0.25*tailWob, L*1.2, 0);
+    ctx.quadraticCurveTo(L*0.8, -L*0.25*tailWob, L*0.4, 0);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = '#e12d2d';
+    const spots = [
+      [ -L*0.25, -L*0.1, L*0.08 ],
+      [ -L*0.15,  L*0.12, L*0.06 ],
+      [  L*0.05, -L*0.08, L*0.07 ],
+      [  L*0.18,  L*0.05, L*0.05 ],
+      [  L*0.28, -L*0.02, L*0.045 ],
+    ];
+    spots.forEach(([x,y,r]) => { ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); });
+
+    ctx.fillStyle = '#212121';
+    ctx.beginPath(); ctx.arc(-L*0.55, -L*0.08, L*0.05, 0, Math.PI*2); ctx.fill();
+
+    ctx.globalAlpha = .12; ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.ellipse(-L*0.2, -L*0.18, L*0.55, L*0.18, 0, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+
+    ctx.restore();
+  }
+
+  // ---- collision
+  function collideSalamander(it) {
+    const s = state.salamander;
+    const rad = (s.base*0.36) * s.scale;
+    const dx = it.x - s.x, dy = it.y - s.y;
+    const rr = (rad + it.r) * (rad + it.r);
+    return (dx*dx + dy*dy) <= rr;
+  }
+
+  // ---- growth/shrink & score ping
+  let ac; // AudioContext
+  function onEat(it) {
+    const s = state.salamander;
+    if (it.kind === 'bug' || it.kind === 'larva') {
+      s.scale = clamp(s.scale * 1.03, 0.3, 3.2);
+      state.score += 5; state.good++; blip(700);
+    } else {
+      s.scale = clamp(s.scale * 0.93, 0.3, 3.2);
+      state.score = Math.max(0, state.score - 3);
+      state.bad++; blip(180); flashSize();
+    }
+    updateHud();
+  }
+  function updateHud(){
+    hud.score.textContent = state.score|0;
+    hud.sizePct.textContent = Math.round(state.salamander.scale*100) + '%';
+    hud.good.textContent = state.good;
+    hud.bad.textContent = state.bad;
+  }
+  function flashSize(){
+    const el = hud.sizePct;
+    el.style.transition = 'color .15s';
+    el.style.color = 'var(--bad)';
+    setTimeout(()=>{ el.style.color='inherit'; }, 160);
+  }
+  function blip(freq=500){
+    try{
+      ac = ac || new (window.AudioContext||window.webkitAudioContext)();
+      if (ac.state === 'suspended') ac.resume();
+      const o = ac.createOscillator(); const g = ac.createGain();
+      o.frequency.value = freq; o.type='triangle'; o.connect(g); g.connect(ac.destination);
+      const now = ac.currentTime;
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(0.08, now+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, now+0.20);
+      o.start(); o.stop(now+0.21);
+    }catch(e){}
+  }
+
+  // ---- main loop
+  let last = performance.now();
+  function loop(now){
+    if(!state.running) return;
+    const dt = Math.min(34, now - last); last = now;
+    state.t += dt;
+
+    drawBackground();
+
+    // spawn pacing
+    state.spawnTimer -= dt;
+    const baseInterval = 800; // ms
+    const difficulty = clamp(1.0 - (state.t/60000)*0.4, 0.6, 1.0);
+    if (state.spawnTimer <= 0){
+      spawnItem();
+      state.spawnTimer = baseInterval * (0.5 + Math.random()*0.8) * difficulty;
+    }
+
+    // update + draw items
+    for (let i=state.items.length-1;i>=0;i--){
+      const it = state.items[i];
+      it.x -= it.speed * (dt * 0.06 + 1);
+      it.rot += it.omega;
+      it.y += Math.sin((it.x + i*77)*0.02) * it.wobble * 0.4;
+
+      drawItem(it);
+
+      if (collideSalamander(it)) {
+        onEat(it);
+        state.items.splice(i,1);
+        continue;
+      }
+      if (it.x < -60) state.items.splice(i,1);
+    }
+
+    drawSalamander(state.salamander);
+
+    // win/lose checks
+    if (state.salamander.scale >= state.winScale) { endGame(true); return; }
+    if (state.salamander.scale <= state.loseScale) { endGame(false); return; }
+
+    requestAnimationFrame(loop);
+  }
+
+  function startGame(){
+    state.running = true;
+    center.classList.add('hide');
+    state.score = 0; state.good = 0; state.bad = 0;
+    state.items.length = 0;
+    state.salamander.scale = 1.0;
+    state.salamander.x = innerWidth*0.3;
+    state.salamander.y = innerHeight*0.5;
+    state.salamander.vx = state.salamander.vy = 0;
+    state.t = 0; state.spawnTimer = 0;
+    updateHud();
+    last = performance.now();
+    // nudge audio on iOS after a user gesture
+    try {
+      ac = ac || new (window.AudioContext||window.webkitAudioContext)();
+      if (ac.state === 'suspended') ac.resume();
+    } catch(e){}
+    requestAnimationFrame(loop);
+  }
+
+  function endGame(win){
+    state.running = false;
+    center.classList.remove('hide');
+    center.querySelector('h1').textContent = win ? 'You Win!' : 'Game Over';
+    center.querySelector('p').innerHTML =
+      (win
+        ? 'Snack discipline on point. Ready for harder currents?'
+        : 'Dodge the trash and toxins next time — aim for clusters of bugs to bounce your size back.')
+      + `<br><br><b>Final Score:</b> ${state.score|0} · <b>Good:</b> ${state.good} · <b>Bad:</b> ${state.bad}`;
+    startBtn.textContent = 'Play Again';
+    blip(win ? 880 : 120);
+  }
+
+  startBtn.addEventListener('click', startGame);
+})();
+</script>
+</body>
+</html>
